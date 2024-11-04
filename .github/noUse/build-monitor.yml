@@ -1,0 +1,69 @@
+name: Android CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        api-level: [30]
+        target: [debug, release]
+        java-version: [17]
+
+    steps:
+      # Checkout the code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up JDK
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'zulu'
+
+      # Cache Gradle dependencies
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # Prepare Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          build-tools: '30.0.3'
+
+      # Build the project using Gradle
+      - name: Build with Gradle
+        run: ./gradlew assemble${{ matrix.target }}
+
+      # Run tests
+      - name: Run unit tests
+        run: ./gradlew test
+
+      - name: Run Ktlint
+        run: ./gradlew ktlintStagingDebugCheck
+
+      - name: Run Unit Tests
+        run: ./gradlew testStagingDebugUnitTest
+
+      - name: Run Linters and Test
+        run: ./gradlew check
+      # If you want to run instrumentation tests (UI tests), use:
+      # - name: Run instrumentation tests
+      #   run: ./gradlew connectedAndroidTest
